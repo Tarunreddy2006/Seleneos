@@ -62,12 +62,17 @@ manifest_content = """<?xml version="1.0" encoding="utf-8"?>
     android:versionCode="1"
     android:versionName="1.0.0">
 
+    <uses-sdk
+        android:minSdkVersion="26"
+        android:targetSdkVersion="34" />
+
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:label="@string/app_name"
+        android:icon="@android:drawable/sym_def_app_icon"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="true"
         android:hardwareAccelerated="true">
@@ -256,6 +261,8 @@ os.makedirs(gen_dir, exist_ok=True)
 cmd_link = [
     AAPT2, "link",
     "-I", ANDROID_JAR,
+    "--min-sdk-version", "26",
+    "--target-sdk-version", "34",
     "--manifest", os.path.join(BUILD_DIR, "AndroidManifest.xml"),
     "--java", gen_dir,
     "-o", os.path.join(BUILD_DIR, "app_res.apk"),
@@ -289,6 +296,7 @@ for root, dirs, files in os.walk(bin_dir):
 
 cmd_d8 = [
     D8,
+    "--min-api", "26",
     "--lib", ANDROID_JAR,
     "--output", BUILD_DIR
 ] + class_files
@@ -339,6 +347,7 @@ cmd_sign = [
     "--ks-key-alias", "daily_intel_key",
     "--ks-pass", "pass:android123",
     "--key-pass", "pass:android123",
+    "--min-sdk-version", "26",
     OUTPUT_APK
 ]
 subprocess.run(cmd_sign, check=True, env=env)
