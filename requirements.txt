@@ -1,0 +1,19 @@
+# Daily Intelligence - Core Dependencies
+# Python 3.13.6 compatible
+
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic>=2.9.0
+pydantic-settings>=2.6.0
+sqlalchemy>=2.0.36
+alembic>=1.14.0
+apscheduler>=3.10.4,<4.0.0
+httpx>=0.27.2
+feedparser>=6.0.11
+beautifulsoup4>=4.12.3
+python-multipart>=0.0.12
+python-dotenv>=1.0.1
+
+# Testing
+pytest>=8.3.0
+pytest-asyncio>=0.24.0

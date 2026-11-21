@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Intelligence | Personal News & Knowledge</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
+</head>
+<body>
+  <!-- Sticky Header -->
+  <header class="site-header">
+    <div class="header-top">
+      <a href="/" class="site-title">
+        <span>DAILY INTELLIGENCE</span>
+        <span class="subtitle-tag">Personal Edition</span>
+      </a>
+
+      <div class="header-controls">
+        <!-- English / Kannada Language Switch -->
+        <div class="lang-switch" role="group" aria-label="Language Selector">
+          <button id="lang-en" class="lang-btn active" onclick="setLanguage('en')">EN</button>
+          <button id="lang-kn" class="lang-btn" onclick="setLanguage('kn')">ಕನ್ನಡ</button>
+        </div>
+
+        <!-- Theme Toggle -->
+        <button id="theme-btn" class="btn-icon" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
+          <span id="theme-icon">🌙</span>
+        </button>
+
+        <!-- Refresh Button -->
+        <button id="refresh-btn" class="btn-icon" onclick="manualRefresh()" title="Refresh News Ingestion">
+          <span>🔄</span> <span id="refresh-label">Refresh</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Category Navigation -->
+    <nav class="category-nav-wrapper">
+      <div class="category-nav" id="category-nav">
+        <a href="#all" class="cat-link active" data-category="all">All Intelligence</a>
+        <a href="#global-business" class="cat-link" data-category="global-business">Global Business</a>
+        <a href="#global-politics" class="cat-link" data-category="global-politics">Global Politics</a>
+        <a href="#indian-politics" class="cat-link" data-category="indian-politics">Indian Politics</a>
+        <a href="#indian-economy" class="cat-link" data-category="indian-economy">Indian Economy</a>
+        <a href="#karnataka-politics" class="cat-link" data-category="karnataka-politics">Karnataka Politics</a>
+        <a href="#technology-science" class="cat-link" data-category="technology-science">Technology & Science</a>
+        <a href="#education" class="cat-link" data-category="education">Education</a>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container">
+    <!-- Today's Briefing Hero Card -->
+    <section id="briefing-section" class="briefing-card">
+      <div class="briefing-meta">
+        <span id="briefing-type-label">Current Briefing</span>
+        <span id="briefing-timestamp">Updated: Checking...</span>
+      </div>
+      <h2 id="briefing-title" class="briefing-title">Intelligence Briefing</h2>
+      <p id="briefing-summary" class="briefing-summary">Loading briefing and synthesizing developments...</p>
+    </section>
+
+    <!-- Section Heading -->
+    <div class="section-header">
+      <h3 id="feed-heading" class="section-title">Latest Developments</h3>
+      <div id="filter-status" style="font-size: 0.9rem; color: var(--text-muted);"></div>
+    </div>
+
+    <!-- Articles Feed Grid -->
+    <div id="articles-container" class="articles-grid">
+      <div class="state-box">
+        <div class="spinner"></div>
+        <p>Loading intelligence stream...</p>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
