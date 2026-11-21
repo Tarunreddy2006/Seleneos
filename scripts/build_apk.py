@@ -52,9 +52,9 @@ bin_dir = os.path.join(BUILD_DIR, "bin")
 for d in [values_dir, layout_dir, drawable_dir, mipmap_mdpi, mipmap_hdpi, mipmap_xhdpi, mipmap_xxhdpi, mipmap_xxxhdpi, assets_dir, src_dir, bin_dir]:
     os.makedirs(d, exist_ok=True)
 
-# Generate / Copy Icons
+# Generate / Copy Icons from app_logo.jpeg
 icon_gen_script = os.path.abspath(os.path.join("scripts", "generate_icon.ps1"))
-if os.path.exists(icon_gen_script) and not os.path.exists("assets_icon"):
+if os.path.exists(icon_gen_script):
     subprocess.run(["powershell", "-ExecutionPolicy", "Bypass", "-File", icon_gen_script], check=True, env=env)
 
 if os.path.exists("assets_icon"):
