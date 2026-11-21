@@ -15,7 +15,7 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-    APP_NAME: str = "Daily Intelligence"
+    APP_NAME: str = "Seleneos"
     APP_VERSION: str = "0.1.0"
     APP_ENV: Literal["development", "production", "testing"] = "development"
     DEBUG: bool = True

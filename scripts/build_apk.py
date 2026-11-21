@@ -19,13 +19,14 @@ JAVAC = os.path.join(JDK_BIN, "javac.exe")
 KEYTOOL = os.path.join(JDK_BIN, "keytool.exe")
 
 BUILD_DIR = os.path.abspath("android_apk_build")
-OUTPUT_APK = os.path.abspath("DailyIntelligence.apk")
+OUTPUT_APK = os.path.abspath("Seleneos.apk")
+COMPAT_APK = os.path.abspath("DailyIntelligence.apk")
 
 env = os.environ.copy()
 env["JAVA_HOME"] = r"C:\Program Files\Java\jdk-17.0.18"
 env["PATH"] = rf"{JDK_BIN};{BUILD_TOOLS};{env.get('PATH', '')}"
 
-print(f"=== Daily Intelligence APK Builder ===")
+print(f"=== Seleneos APK Builder ===")
 print(f"Building in: {BUILD_DIR}")
 print(f"Target Output: {OUTPUT_APK}")
 
@@ -38,12 +39,32 @@ res_dir = os.path.join(BUILD_DIR, "res")
 values_dir = os.path.join(res_dir, "values")
 layout_dir = os.path.join(res_dir, "layout")
 drawable_dir = os.path.join(res_dir, "drawable")
+mipmap_mdpi = os.path.join(res_dir, "mipmap-mdpi")
+mipmap_hdpi = os.path.join(res_dir, "mipmap-hdpi")
+mipmap_xhdpi = os.path.join(res_dir, "mipmap-xhdpi")
+mipmap_xxhdpi = os.path.join(res_dir, "mipmap-xxhdpi")
+mipmap_xxxhdpi = os.path.join(res_dir, "mipmap-xxxhdpi")
+
 assets_dir = os.path.join(BUILD_DIR, "assets")
-src_dir = os.path.join(BUILD_DIR, "src", "com", "dailyintelligence", "app")
+src_dir = os.path.join(BUILD_DIR, "src", "com", "seleneos", "app")
 bin_dir = os.path.join(BUILD_DIR, "bin")
 
-for d in [values_dir, layout_dir, drawable_dir, assets_dir, src_dir, bin_dir]:
+for d in [values_dir, layout_dir, drawable_dir, mipmap_mdpi, mipmap_hdpi, mipmap_xhdpi, mipmap_xxhdpi, mipmap_xxxhdpi, assets_dir, src_dir, bin_dir]:
     os.makedirs(d, exist_ok=True)
+
+# Generate / Copy Icons
+icon_gen_script = os.path.abspath(os.path.join("scripts", "generate_icon.ps1"))
+if os.path.exists(icon_gen_script) and not os.path.exists("assets_icon"):
+    subprocess.run(["powershell", "-ExecutionPolicy", "Bypass", "-File", icon_gen_script], check=True, env=env)
+
+if os.path.exists("assets_icon"):
+    shutil.copy2(os.path.join("assets_icon", "ic_launcher.png"), os.path.join(drawable_dir, "ic_launcher.png"))
+    shutil.copy2(os.path.join("assets_icon", "ic_launcher.png"), os.path.join(mipmap_xxxhdpi, "ic_launcher.png"))
+    shutil.copy2(os.path.join("assets_icon", "mipmap-xxhdpi", "ic_launcher.png"), os.path.join(mipmap_xxhdpi, "ic_launcher.png"))
+    shutil.copy2(os.path.join("assets_icon", "mipmap-xhdpi", "ic_launcher.png"), os.path.join(mipmap_xhdpi, "ic_launcher.png"))
+    shutil.copy2(os.path.join("assets_icon", "mipmap-hdpi", "ic_launcher.png"), os.path.join(mipmap_hdpi, "ic_launcher.png"))
+    shutil.copy2(os.path.join("assets_icon", "mipmap-mdpi", "ic_launcher.png"), os.path.join(mipmap_mdpi, "ic_launcher.png"))
+    print("✓ App icons installed across all mipmap densities")
 
 # 1. Copy Frontend Assets
 frontend_src = os.path.abspath(os.path.join("app", "frontend"))
@@ -58,7 +79,7 @@ for item in os.listdir(frontend_src):
 # 2. Write AndroidManifest.xml
 manifest_content = """<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.dailyintelligence.app"
+    package="com.seleneos.app"
     android:versionCode="1"
     android:versionName="1.0.0">
 
@@ -72,7 +93,8 @@ manifest_content = """<?xml version="1.0" encoding="utf-8"?>
 
     <application
         android:label="@string/app_name"
-        android:icon="@android:drawable/sym_def_app_icon"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="true"
         android:hardwareAccelerated="true">
@@ -94,7 +116,7 @@ with open(os.path.join(BUILD_DIR, "AndroidManifest.xml"), "w", encoding="utf-8")
 # 3. Write strings.xml
 strings_content = """<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Daily Intelligence</string>
+    <string name="app_name">Seleneos</string>
 </resources>
 """
 with open(os.path.join(values_dir, "strings.xml"), "w", encoding="utf-8") as f:
@@ -117,7 +139,7 @@ with open(os.path.join(layout_dir, "activity_main.xml"), "w", encoding="utf-8") 
     f.write(layout_content)
 
 # 5. Write MainActivity.java (Embedded Standalone Engine with Native Bridge)
-main_activity = """package com.dailyintelligence.app;
+main_activity = """package com.seleneos.app;
 
 import android.app.Activity;
 import android.content.Intent;
@@ -162,7 +184,7 @@ public class MainActivity extends Activity {
                 URL url = new URL(urlString);
                 conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
-                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) DailyIntelligence/1.0");
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) Seleneos/1.0");
                 conn.setRequestProperty("Accept", "application/rss+xml, application/xml, text/xml, */*");
                 conn.setConnectTimeout(12000);
                 conn.setReadTimeout(15000);
@@ -273,7 +295,7 @@ cmd_link = [
 subprocess.run(cmd_link, check=True, env=env)
 
 print("[3/6] Compiling Java classes with javac...")
-r_java = os.path.join(gen_dir, "com", "dailyintelligence", "app", "R.java")
+r_java = os.path.join(gen_dir, "com", "seleneos", "app", "R.java")
 java_src = os.path.join(src_dir, "MainActivity.java")
 
 cmd_javac = [
@@ -327,13 +349,13 @@ if not os.path.exists(keystore_path):
         "-genkeypair",
         "-v",
         "-keystore", keystore_path,
-        "-alias", "daily_intel_key",
+        "-alias", "seleneos_key",
         "-keyalg", "RSA",
         "-keysize", "2048",
         "-validity", "10000",
-        "-storepass", "android123",
-        "-keypass", "android123",
-        "-dname", "CN=DailyIntelligence, OU=Personal, O=Intelligence, L=Bengaluru, ST=Karnataka, C=IN"
+        "-storepass", "seleneos123",
+        "-keypass", "seleneos123",
+        "-dname", "CN=Seleneos, OU=Personal, O=Intelligence, L=Bengaluru, ST=Karnataka, C=IN"
     ]
     subprocess.run(cmd_keytool, check=True, env=env)
 
@@ -344,13 +366,17 @@ shutil.copy2(aligned_apk, OUTPUT_APK)
 cmd_sign = [
     APKSIGNER, "sign",
     "--ks", keystore_path,
-    "--ks-key-alias", "daily_intel_key",
-    "--ks-pass", "pass:android123",
-    "--key-pass", "pass:android123",
+    "--ks-key-alias", "seleneos_key",
+    "--ks-pass", "pass:seleneos123",
+    "--key-pass", "pass:seleneos123",
     "--min-sdk-version", "26",
     OUTPUT_APK
 ]
 subprocess.run(cmd_sign, check=True, env=env)
 
+# Also copy to COMPAT_APK
+shutil.copy2(OUTPUT_APK, COMPAT_APK)
+
 size_mb = os.path.getsize(OUTPUT_APK) / (1024 * 1024)
 print(f"SUCCESS: Generated signed APK at: {OUTPUT_APK} ({size_mb:.2f} MB)")
+print(f"SUCCESS: Synced compatibility copy at: {COMPAT_APK}")

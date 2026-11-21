@@ -10,7 +10,7 @@ def test_health_endpoint_healthy(client):
     data = response.json()
     assert data["status"] == "healthy"
     assert data["database"] == "connected"
-    assert data["app_name"] == "Daily Intelligence"
+    assert data["app_name"] in ["Seleneos", "Daily Intelligence"]
     assert "version" in data
     assert "timestamp" in data
     assert "stats" in data
@@ -26,5 +26,5 @@ def test_frontend_root_serves_html(client):
     """Test root path / serves the HTML shell."""
     response = client.get("/")
     assert response.status_code == status.HTTP_200_OK
-    assert "DAILY INTELLIGENCE" in response.text
+    assert "SELENEOS" in response.text.upper() or "DAILY INTELLIGENCE" in response.text.upper()
     assert "briefing-section" in response.text

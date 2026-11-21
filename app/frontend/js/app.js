@@ -134,7 +134,7 @@ async function loadHealthTelemetry() {
         tsEl.textContent = `Autonomous Mode | On-Device Sources: ${window.embeddedEngine.sources.length} | Articles: ${artCount}`;
       }
     } catch (e) {
-      if (tsEl) tsEl.textContent = "Autonomous Mode | Daily Intelligence";
+      if (tsEl) tsEl.textContent = "Autonomous Mode | Seleneos";
     }
     return;
   }
@@ -189,7 +189,7 @@ function renderBriefing() {
   if (!titleEl || !summaryEl || !appState.briefing) return;
 
   const isKn = appState.language === "kn";
-  titleEl.textContent = isKn ? "ದೈನಂದಿನ ಇಂಟೆಲಿಜೆನ್ಸ್ ಬ್ರೀಫಿಂಗ್" : "Daily Intelligence Briefing";
+  titleEl.textContent = isKn ? "ಸೆಲೆನಿಯೋಸ್ ಇಂಟೆಲಿಜೆನ್ಸ್ ಬ್ರೀಫಿಂಗ್" : "Seleneos Intelligence Briefing";
   summaryEl.textContent = isKn
     ? (appState.briefing.summary_kn || appState.briefing.summary_en)
     : (appState.briefing.summary_en || "Briefing compilation scheduled for 6:00 AM and 6:00 PM IST.");
