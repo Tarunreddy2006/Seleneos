@@ -3,18 +3,24 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Environments
+# Environments & Secrets (Confidential)
 venv/
 .env
 .env.local
+.env.*.local
+*.pem
+*.key
+*.keystore
+release.keystore
 
-# Database & Runtime
+# Database & Runtime (Private / Local data)
 data/*.db
 data/*.db-journal
 data/*.db-wal
 data/*.db-shm
 logs/*.log
 logs/*.jsonl
+data/backups/
 
 # Testing & Coverage
 .pytest_cache/
@@ -29,8 +35,6 @@ Thumbs.db
 
 # Android Build Outputs
 android_apk_build/
-*.apk
 *.idsig
 *.tar.gz
 *.zip
-data/backups/
