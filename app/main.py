@@ -65,6 +65,12 @@ def create_app() -> FastAPI:
     frontend_dir = BASE_DIR / "app" / "frontend"
     if frontend_dir.exists():
         app.mount("/static", StaticFiles(directory=str(frontend_dir)), name="static")
+        css_dir = frontend_dir / "css"
+        if css_dir.exists():
+            app.mount("/css", StaticFiles(directory=str(css_dir)), name="css")
+        js_dir = frontend_dir / "js"
+        if js_dir.exists():
+            app.mount("/js", StaticFiles(directory=str(js_dir)), name="js")
 
     # Serve Main Frontend SPA Shell
     @app.get("/", include_in_schema=False)

@@ -111,37 +111,85 @@ layout_content = """<?xml version="1.0" encoding="utf-8"?>
 with open(os.path.join(layout_dir, "activity_main.xml"), "w", encoding="utf-8") as f:
     f.write(layout_content)
 
-# 5. Write MainActivity.java (with dynamic server connection dialog & resilient fallback)
+# 5. Write MainActivity.java (Embedded Standalone Engine with Native Bridge)
 main_activity = """package com.dailyintelligence.app;
 
 import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.DialogInterface;
-import android.content.SharedPreferences;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.WebChromeClient;
 import android.view.KeyEvent;
 import android.view.Window;
-import android.widget.EditText;
-import android.widget.LinearLayout;
 import android.widget.Toast;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 public class MainActivity extends Activity {
     private WebView webView;
-    private SharedPreferences prefs;
-    private static final String PREF_KEY_SERVER = "server_url";
-    private static final String DEFAULT_SERVER = "http://127.0.0.1:8000";
+
+    public class WebAppInterface {
+        @JavascriptInterface
+        public boolean isNativeApp() {
+            return true;
+        }
+
+        @JavascriptInterface
+        public void showToast(final String message) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public String fetchHttp(String urlString) {
+            HttpURLConnection conn = null;
+            try {
+                URL url = new URL(urlString);
+                conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) DailyIntelligence/1.0");
+                conn.setRequestProperty("Accept", "application/rss+xml, application/xml, text/xml, */*");
+                conn.setConnectTimeout(12000);
+                conn.setReadTimeout(15000);
+                conn.setInstanceFollowRedirects(true);
+
+                int code = conn.getResponseCode();
+                if (code >= 200 && code < 400) {
+                    BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                    StringBuilder response = new StringBuilder();
+                    String line;
+                    while ((line = in.readLine()) != null) {
+                        response.append(line).append("\\n");
+                    }
+                    in.close();
+                    return response.toString();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                if (conn != null) {
+                    conn.disconnect();
+                }
+            }
+            return null;
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.activity_main);
-
-        prefs = getSharedPreferences("daily_intel_prefs", MODE_PRIVATE);
 
         webView = findViewById(R.id.webview);
         WebSettings settings = webView.getSettings();
@@ -150,6 +198,8 @@ public class MainActivity extends Activity {
         settings.setDatabaseEnabled(true);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
+        settings.setAllowFileAccessFromFileURLs(true);
+        settings.setAllowUniversalAccessFromFileURLs(true);
         settings.setUseWideViewPort(true);
         settings.setLoadWithOverviewMode(true);
         settings.setSupportZoom(true);
@@ -160,90 +210,22 @@ public class MainActivity extends Activity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                if (url.startsWith("app://configure-server")) {
-                    showServerConfigDialog();
-                    return true;
+                if (url.startsWith("http://") || url.startsWith("https://")) {
+                    try {
+                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                        startActivity(intent);
+                        return true;
+                    } catch (Exception e) {
+                        return false;
+                    }
                 }
                 view.loadUrl(url);
                 return true;
             }
-
-            @Override
-            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-                showErrorPage(failingUrl, description);
-            }
         });
 
-        loadCurrentServer();
-    }
-
-    private String getServerUrl() {
-        return prefs.getString(PREF_KEY_SERVER, DEFAULT_SERVER);
-    }
-
-    private void loadCurrentServer() {
-        String url = getServerUrl();
-        webView.loadUrl(url);
-    }
-
-    private void showErrorPage(String failingUrl, String errorMsg) {
-        String server = getServerUrl();
-        String html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'>"
-            + "<style>body{font-family:-apple-system,sans-serif;background:#0f172a;color:#f8fafc;padding:32px 20px;text-align:center;}"
-            + ".card{background:#1e293b;border-radius:12px;padding:24px;border:1px solid #334155;margin-top:20px;box-shadow:0 4px 6px rgba(0,0,0,0.3);}"
-            + "h2{font-size:1.3rem;margin-bottom:8px;color:#60a5fa;}p{color:#94a3b8;font-size:0.95rem;line-height:1.5;}"
-            + "code{background:#0f172a;padding:3px 8px;border-radius:4px;color:#38bdf8;font-size:0.9rem;}"
-            + "button{background:#2563eb;color:#fff;border:none;padding:10px 18px;border-radius:6px;font-size:0.92rem;font-weight:600;margin:8px 4px;cursor:pointer;}"
-            + ".btn-sec{background:#334155;color:#e2e8f0;}"
-            + "</style></head><body>"
-            + "<div class='card'>"
-            + "<h2>Daily Intelligence</h2>"
-            + "<p>Waiting to connect to backend server at:<br><br><code>" + server + "</code></p>"
-            + "<p style='font-size:0.85rem;color:#64748b;margin-top:14px;'>Run your backend on phone (127.0.0.1:8000) or connect to your laptop over Wi-Fi.</p>"
-            + "<div style='margin-top:24px;display:flex;justify-content:center;gap:12px;'>"
-            + "<button onclick='location.reload()'>Retry</button>"
-            + "<a href='app://configure-server' style='background:#334155;color:#e2e8f0;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;font-size:0.92rem;'>Change Server IP</a>"
-            + "</div></div></body></html>";
-        webView.loadDataWithBaseURL(null, html, "text/html", "utf-8", null);
-    }
-
-    private void showServerConfigDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Server Connection Settings");
-        builder.setMessage("Enter the URL of your Daily Intelligence backend server:");
-
-        final EditText input = new EditText(this);
-        input.setText(getServerUrl());
-        input.setSelection(input.getText().length());
-
-        LinearLayout layout = new LinearLayout(this);
-        layout.setPadding(40, 20, 40, 10);
-        layout.addView(input);
-        builder.setView(layout);
-
-        builder.setPositiveButton("Connect", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                String newUrl = input.getText().toString().trim();
-                if (!newUrl.startsWith("http://") && !newUrl.startsWith("https://")) {
-                    newUrl = "http://" + newUrl;
-                }
-                prefs.edit().putString(PREF_KEY_SERVER, newUrl).apply();
-                Toast.makeText(MainActivity.this, "Connecting to " + newUrl, Toast.LENGTH_SHORT).show();
-                loadCurrentServer();
-            }
-        });
-
-        builder.setNeutralButton("Reset (127.0.0.1)", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                prefs.edit().putString(PREF_KEY_SERVER, DEFAULT_SERVER).apply();
-                loadCurrentServer();
-            }
-        });
-
-        builder.setNegativeButton("Cancel", null);
-        builder.show();
+        webView.addJavascriptInterface(new WebAppInterface(), "AndroidBridge");
+        webView.loadUrl("file:///android_asset/index.html");
     }
 
     @Override

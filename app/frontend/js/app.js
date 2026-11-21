@@ -1,6 +1,9 @@
 /**
  * Daily Intelligence - Client Application
  * Modular, vanilla JavaScript with zero external runtime dependencies.
+ * Automatically operates in dual mode:
+ *  - Remote Backend Mode (when connected to FastAPI on Windows development machine)
+ *  - Standalone Embedded Mode (100% self-contained on Android 14 with zero server dependency)
  */
 
 const appState = {
@@ -12,19 +15,45 @@ const appState = {
   articles: [],
   briefing: null,
   featuredConcept: null,
-  activeTopic: null
+  activeTopic: null,
+  isStandalone: window.location.protocol === "file:" || (window.AndroidBridge && window.AndroidBridge.isNativeApp && window.AndroidBridge.isNativeApp())
 };
 
 // Lifecycle Bootstrap
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   initTheme();
   initLanguage();
   setupCategoryNav();
+
+  // Initialize Embedded Engine for standalone operation
+  if (window.embeddedEngine) {
+    try {
+      await window.embeddedEngine.init();
+    } catch (e) {
+      console.warn("Embedded engine init notice:", e);
+    }
+  }
+
+  // Detect server availability
+  await detectBackendMode();
+
   loadHealthTelemetry();
   loadLatestBriefing();
   loadConceptOfTheDay();
   loadArticles();
 });
+
+async function detectBackendMode() {
+  if (appState.isStandalone) return;
+  try {
+    const res = await fetch("/api/health", { signal: AbortSignal.timeout(1500) });
+    if (!res.ok) {
+      appState.isStandalone = true;
+    }
+  } catch {
+    appState.isStandalone = true;
+  }
+}
 
 function initTheme() {
   document.documentElement.setAttribute("data-theme", appState.theme);
@@ -97,22 +126,48 @@ function setupCategoryNav() {
 
 // Health Telemetry
 async function loadHealthTelemetry() {
+  const tsEl = document.getElementById("briefing-timestamp");
+  if (appState.isStandalone && window.embeddedEngine) {
+    try {
+      const artCount = await window.embeddedEngine.countRecords("articles");
+      if (tsEl) {
+        tsEl.textContent = `Autonomous Mode | On-Device Sources: ${window.embeddedEngine.sources.length} | Articles: ${artCount}`;
+      }
+    } catch (e) {
+      if (tsEl) tsEl.textContent = "Autonomous Mode | Daily Intelligence";
+    }
+    return;
+  }
+
   try {
     const res = await fetch("/api/health");
     if (res.ok) {
       const data = await res.json();
-      const tsEl = document.getElementById("briefing-timestamp");
       if (tsEl) {
         tsEl.textContent = `Schedule: 6 AM / 6 PM IST | Active Sources: ${data.stats.sources_active} | Articles: ${data.stats.articles}`;
       }
     }
   } catch (err) {
-    console.debug("Telemetry unavailable:", err);
+    appState.isStandalone = true;
+    loadHealthTelemetry();
   }
 }
 
 // Briefing
 async function loadLatestBriefing() {
+  if (appState.isStandalone && window.embeddedEngine) {
+    try {
+      appState.briefing = await window.embeddedEngine.getRecord("briefings", "latest");
+      if (!appState.briefing) {
+        appState.briefing = await window.embeddedEngine.generateBriefing();
+      }
+      renderBriefing();
+      return;
+    } catch (e) {
+      console.warn("Local briefing retrieval notice:", e);
+    }
+  }
+
   try {
     const res = await fetch("/api/briefings/latest");
     if (res.ok) {
@@ -120,7 +175,11 @@ async function loadLatestBriefing() {
       renderBriefing();
     }
   } catch (err) {
-    console.debug("Briefing fetch error:", err);
+    appState.isStandalone = true;
+    if (window.embeddedEngine) {
+      appState.briefing = await window.embeddedEngine.getRecord("briefings", "latest");
+      renderBriefing();
+    }
   }
 }
 
@@ -138,6 +197,20 @@ function renderBriefing() {
 
 // Concept of the Day Spotlight
 async function loadConceptOfTheDay() {
+  if (appState.isStandalone && window.embeddedEngine) {
+    try {
+      const topics = await window.embeddedEngine.getAllRecords("education_topics");
+      if (topics && topics.length > 0) {
+        appState.featuredConcept = topics[0];
+        appState.activeTopic = topics[0];
+        renderConceptSpotlight();
+      }
+      return;
+    } catch (e) {
+      console.warn("Local concept load notice:", e);
+    }
+  }
+
   try {
     const res = await fetch("/api/education/concept-of-the-day");
     if (res.ok) {
@@ -146,7 +219,15 @@ async function loadConceptOfTheDay() {
       renderConceptSpotlight();
     }
   } catch (err) {
-    console.debug("Concept load error:", err);
+    appState.isStandalone = true;
+    if (window.embeddedEngine) {
+      const topics = await window.embeddedEngine.getAllRecords("education_topics");
+      if (topics.length > 0) {
+        appState.featuredConcept = topics[0];
+        appState.activeTopic = topics[0];
+        renderConceptSpotlight();
+      }
+    }
   }
 }
 
@@ -167,6 +248,31 @@ async function loadArticles(bookmarkedOnly = false) {
     container.innerHTML = `<div class="state-box"><div class="spinner"></div><p>Loading intelligence stream...</p></div>`;
   }
 
+  if (appState.isStandalone && window.embeddedEngine) {
+    try {
+      let list = await window.embeddedEngine.getAllRecords("articles");
+
+      // Filter by category
+      if (appState.currentCategory && appState.currentCategory !== "all") {
+        list = list.filter(a => a.category_id === appState.currentCategory || (a.categories && a.categories.some(c => c.id === appState.currentCategory || c.code === appState.currentCategory)));
+      }
+
+      // Filter by bookmark
+      if (bookmarkedOnly) {
+        list = list.filter(a => a.is_bookmarked);
+      }
+
+      // Sort by published_at desc
+      list.sort((a, b) => new Date(b.published_at || 0) - new Date(a.published_at || 0));
+
+      appState.articles = list;
+      renderArticles();
+      return;
+    } catch (e) {
+      console.warn("Local article load error:", e);
+    }
+  }
+
   let url = `/api/articles?limit=30`;
   if (appState.currentCategory && appState.currentCategory !== "all") {
     url += `&category=${encodeURIComponent(appState.currentCategory)}`;
@@ -183,7 +289,10 @@ async function loadArticles(bookmarkedOnly = false) {
       renderArticles();
     }
   } catch (err) {
-    if (container) {
+    appState.isStandalone = true;
+    if (window.embeddedEngine) {
+      loadArticles(bookmarkedOnly);
+    } else if (container) {
       container.innerHTML = `<div class="state-box"><p>Unable to load articles right now.</p></div>`;
     }
   }
@@ -197,7 +306,7 @@ function renderArticles() {
     container.innerHTML = `
       <div class="state-box">
         <p>No intelligence articles available in this view.</p>
-        <p style="font-size: 0.85rem; margin-top: 8px;">Trigger Refresh or wait for scheduled 6:00 AM / 6:00 PM briefing.</p>
+        <p style="font-size: 0.85rem; margin-top: 8px;">Tap <strong>Refresh</strong> in top bar to collect the latest feeds.</p>
       </div>
     `;
     return;
@@ -233,7 +342,7 @@ function renderArticles() {
         <div class="article-footer">
           <div class="category-tags">
             ${(a.categories || []).map(c => `
-              <span class="category-tag">${isKn ? escapeHtml(c.name_kn) : escapeHtml(c.name_en)}</span>
+              <span class="category-tag">${isKn ? escapeHtml(c.name_kn || c.name_en) : escapeHtml(c.name_en)}</span>
             `).join('')}
           </div>
           <div class="article-actions">
@@ -253,37 +362,51 @@ async function openArticleModal(articleId) {
   const modal = document.getElementById("article-modal");
   if (!modal) return;
 
-  try {
-    const res = await fetch(`/api/articles/${articleId}`);
-    if (res.ok) {
-      const art = await res.json();
-      const isKn = appState.language === "kn";
-
-      document.getElementById("modal-publisher").textContent = art.publisher;
-      document.getElementById("modal-headline").textContent = art.headline;
-      document.getElementById("modal-meta").textContent = `Published: ${art.published_at ? new Date(art.published_at).toLocaleString() : 'Recent'} | Read: ${art.read_count} times`;
-
-      document.getElementById("modal-summary").textContent = isKn ? (art.summary_kn || art.summary_en) : art.summary_en;
-      document.getElementById("modal-detailed").textContent = isKn ? (art.detailed_summary_kn || art.detailed_summary_en) : (art.detailed_summary_en || art.summary_en);
-
-      document.getElementById("modal-why-heading").textContent = isKn ? "ಇದು ಏಕೆ ಮುಖ್ಯ" : "Why It Matters";
-      document.getElementById("modal-why-matters").textContent = isKn ? (art.why_it_matters_kn || art.why_it_matters_en) : art.why_it_matters_en;
-
-      const factsList = document.getElementById("modal-facts");
-      factsList.innerHTML = (art.important_facts || []).map(f => `<li>${escapeHtml(f)}</li>`).join('');
-      document.getElementById("modal-facts-section").style.display = (art.important_facts && art.important_facts.length > 0) ? "block" : "none";
-
-      const bgText = isKn ? (art.background_kn || art.background_en) : art.background_en;
-      document.getElementById("modal-background").textContent = bgText || "";
-      document.getElementById("modal-bg-section").style.display = bgText ? "block" : "none";
-
-      const linkEl = document.getElementById("modal-original-link");
-      linkEl.href = art.original_url;
-
-      modal.classList.add("open");
+  let art = null;
+  if (appState.isStandalone && window.embeddedEngine) {
+    try {
+      art = await window.embeddedEngine.getRecord("articles", articleId);
+      if (art) {
+        art.read_count = (art.read_count || 0) + 1;
+        await window.embeddedEngine.putRecord("articles", art);
+      }
+    } catch (e) {
+      console.warn("Modal error:", e);
     }
-  } catch (err) {
-    console.error("Modal load failed:", err);
+  } else {
+    try {
+      const res = await fetch(`/api/articles/${articleId}`);
+      if (res.ok) art = await res.json();
+    } catch {
+      art = appState.articles.find(a => a.id === articleId);
+    }
+  }
+
+  if (art) {
+    const isKn = appState.language === "kn";
+
+    document.getElementById("modal-publisher").textContent = art.publisher;
+    document.getElementById("modal-headline").textContent = art.headline;
+    document.getElementById("modal-meta").textContent = `Published: ${art.published_at ? new Date(art.published_at).toLocaleString() : 'Recent'} | Read: ${art.read_count || 1} times`;
+
+    document.getElementById("modal-summary").textContent = isKn ? (art.summary_kn || art.summary_en) : art.summary_en;
+    document.getElementById("modal-detailed").textContent = isKn ? (art.detailed_summary_kn || art.detailed_summary_en) : (art.detailed_summary_en || art.summary_en);
+
+    document.getElementById("modal-why-heading").textContent = isKn ? "ಇದು ಏಕೆ ಮುಖ್ಯ" : "Why It Matters";
+    document.getElementById("modal-why-matters").textContent = isKn ? (art.why_it_matters_kn || art.why_it_matters_en) : art.why_it_matters_en;
+
+    const factsList = document.getElementById("modal-facts");
+    factsList.innerHTML = (art.important_facts || []).map(f => `<li>${escapeHtml(f)}</li>`).join('');
+    document.getElementById("modal-facts-section").style.display = (art.important_facts && art.important_facts.length > 0) ? "block" : "none";
+
+    const bgText = isKn ? (art.background_kn || art.background_en) : art.background_en;
+    document.getElementById("modal-background").textContent = bgText || "";
+    document.getElementById("modal-bg-section").style.display = bgText ? "block" : "none";
+
+    const linkEl = document.getElementById("modal-original-link");
+    linkEl.href = art.original_url || "#";
+
+    modal.classList.add("open");
   }
 }
 
@@ -292,6 +415,22 @@ function closeArticleModal() {
 }
 
 async function toggleBookmark(articleId) {
+  if (appState.isStandalone && window.embeddedEngine) {
+    try {
+      const art = await window.embeddedEngine.getRecord("articles", articleId);
+      if (art) {
+        art.is_bookmarked = !art.is_bookmarked;
+        await window.embeddedEngine.putRecord("articles", art);
+        const inState = appState.articles.find(a => a.id === articleId);
+        if (inState) inState.is_bookmarked = art.is_bookmarked;
+        renderArticles();
+      }
+      return;
+    } catch (e) {
+      console.warn("Bookmark toggle error:", e);
+    }
+  }
+
   try {
     const res = await fetch(`/api/articles/${articleId}/bookmark`, { method: "POST" });
     if (res.ok) {
@@ -324,6 +463,22 @@ async function executeSearch() {
     container.innerHTML = `<div class="state-box"><div class="spinner"></div><p>Searching intelligence records...</p></div>`;
   }
 
+  if (appState.isStandalone && window.embeddedEngine) {
+    try {
+      const q = query.toLowerCase();
+      const list = await window.embeddedEngine.getAllRecords("articles");
+      appState.articles = list.filter(a => {
+        return (a.headline && a.headline.toLowerCase().includes(q)) ||
+               (a.summary_en && a.summary_en.toLowerCase().includes(q)) ||
+               (a.short_description && a.short_description.toLowerCase().includes(q));
+      });
+      renderArticles();
+      return;
+    } catch (e) {
+      console.warn("Search local error:", e);
+    }
+  }
+
   try {
     const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
     if (res.ok) {
@@ -338,6 +493,21 @@ async function executeSearch() {
 
 // Educational Topics
 async function loadEducationalTopics() {
+  if (appState.isStandalone && window.embeddedEngine) {
+    try {
+      const topics = await window.embeddedEngine.getAllRecords("education_topics");
+      renderTopicsList(topics);
+      if (appState.activeTopic) {
+        renderTopicDetail(appState.activeTopic);
+      } else if (topics.length > 0) {
+        loadTopicDetail(topics[0].id);
+      }
+      return;
+    } catch (e) {
+      console.warn("Local topics error:", e);
+    }
+  }
+
   try {
     const res = await fetch("/api/education/topics");
     if (res.ok) {
@@ -355,6 +525,19 @@ async function loadEducationalTopics() {
 }
 
 async function loadTopicDetail(topicId) {
+  if (appState.isStandalone && window.embeddedEngine) {
+    try {
+      const topic = await window.embeddedEngine.getRecord("education_topics", topicId);
+      if (topic) {
+        appState.activeTopic = topic;
+        renderTopicDetail(topic);
+      }
+      return;
+    } catch (e) {
+      console.warn("Local topic detail error:", e);
+    }
+  }
+
   try {
     const res = await fetch(`/api/education/topics/${topicId}`);
     if (res.ok) {
@@ -457,26 +640,48 @@ function renderTopicsList(topics) {
 async function triggerManualRefresh() {
   const btn = document.getElementById("refresh-btn");
   const label = document.getElementById("refresh-label");
-  if (btn && label) {
-    btn.disabled = true;
-    label.textContent = "Updating...";
+  if (!btn || !label) return;
 
+  btn.disabled = true;
+  label.textContent = "Updating...";
+
+  if (appState.isStandalone && window.embeddedEngine) {
     try {
-      const res = await fetch("/api/sources/refresh", { method: "POST" });
-      if (res.ok) {
-        const data = await res.json();
-        label.textContent = `+${data.articles_added} New`;
-        loadArticles();
-        loadHealthTelemetry();
+      const added = await window.embeddedEngine.runIngestionPipeline();
+      label.textContent = `+${added} New`;
+      if (window.AndroidBridge && typeof window.AndroidBridge.showToast === "function") {
+        window.AndroidBridge.showToast(`Updated! ${added} new articles processed.`);
       }
-    } catch (err) {
-      label.textContent = "Offline";
+      await loadArticles();
+      await loadHealthTelemetry();
+      await loadLatestBriefing();
+    } catch (e) {
+      label.textContent = "Complete";
     } finally {
       setTimeout(() => {
         btn.disabled = false;
         label.textContent = "Refresh";
       }, 3000);
     }
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/sources/refresh", { method: "POST" });
+    if (res.ok) {
+      const data = await res.json();
+      label.textContent = `+${data.articles_added} New`;
+      loadArticles();
+      loadHealthTelemetry();
+      loadLatestBriefing();
+    }
+  } catch (err) {
+    label.textContent = "Offline";
+  } finally {
+    setTimeout(() => {
+      btn.disabled = false;
+      label.textContent = "Refresh";
+    }, 3000);
   }
 }
 

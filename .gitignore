@@ -26,3 +26,11 @@ htmlcov/
 Thumbs.db
 .vscode/
 .idea/
+
+# Android Build Outputs
+android_apk_build/
+*.apk
+*.idsig
+*.tar.gz
+*.zip
+data/backups/
