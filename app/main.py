@@ -8,6 +8,9 @@ from app.config import settings, BASE_DIR
 from app.core.logging import logger
 from app.database.session import init_db, SessionLocal
 from app.database.seed import seed_categories
+from app.ingestion.source_registry import seed_sources
+from app.education.seed_topics import seed_educational_topics
+from app.core.scheduler import scheduler_service, check_and_recover_missed_briefings
 from app.api.routes import api_router
 
 
@@ -25,12 +28,21 @@ async def lifespan(app: FastAPI):
             init_db()
             with SessionLocal() as db:
                 seed_categories(db)
-            logger.info("Database and core categories initialized successfully.")
+                seed_sources(db)
+                seed_educational_topics(db)
+            logger.info("Database, categories, sources, and educational topics initialized.")
+
+            # Start APScheduler & run missed briefing recovery
+            scheduler_service.start()
+            await check_and_recover_missed_briefings()
         except Exception as exc:
-            logger.error("Failed to initialize database: %s", exc, exc_info=True)
+            logger.error("Failed to initialize database or scheduler: %s", exc, exc_info=True)
             raise
 
     yield
+
+    if settings.APP_ENV != "testing":
+        scheduler_service.shutdown()
 
     logger.info("Shutting down %s...", settings.APP_NAME)
 

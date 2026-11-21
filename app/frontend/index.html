@@ -11,10 +11,18 @@
   <!-- Sticky Header -->
   <header class="site-header">
     <div class="header-top">
-      <a href="/" class="site-title">
-        <span>DAILY INTELLIGENCE</span>
-        <span class="subtitle-tag">Personal Edition</span>
-      </a>
+      <div class="brand-group">
+        <a href="/" class="site-title">
+          <span>DAILY INTELLIGENCE</span>
+          <span class="subtitle-tag">Personal Edition</span>
+        </a>
+      </div>
+
+      <!-- Live Search Bar -->
+      <div class="search-bar-wrapper">
+        <input type="text" id="search-input" class="search-input" placeholder="Search intelligence, topics, policies..." onkeyup="handleSearch(event)">
+        <button id="search-btn" class="search-btn" onclick="executeSearch()">🔍</button>
+      </div>
 
       <div class="header-controls">
         <!-- English / Kannada Language Switch -->
@@ -29,14 +37,23 @@
         </button>
 
         <!-- Refresh Button -->
-        <button id="refresh-btn" class="btn-icon" onclick="manualRefresh()" title="Refresh News Ingestion">
+        <button id="refresh-btn" class="btn-icon" onclick="triggerManualRefresh()" title="Refresh News Ingestion">
           <span>🔄</span> <span id="refresh-label">Refresh</span>
         </button>
       </div>
     </div>
 
-    <!-- Category Navigation -->
-    <nav class="category-nav-wrapper">
+    <!-- Main View Tabs -->
+    <div class="main-tabs-wrapper">
+      <div class="main-tabs">
+        <button id="tab-feed" class="tab-btn active" onclick="switchView('feed')">📰 Intelligence Feed</button>
+        <button id="tab-bookmarks" class="tab-btn" onclick="switchView('bookmarks')">★ Bookmarked</button>
+        <button id="tab-education" class="tab-btn" onclick="switchView('education')">🎓 Knowledge Library</button>
+      </div>
+    </div>
+
+    <!-- Category Navigation (Visible in Feed View) -->
+    <nav class="category-nav-wrapper" id="category-nav-bar">
       <div class="category-nav" id="category-nav">
         <a href="#all" class="cat-link active" data-category="all">All Intelligence</a>
         <a href="#global-business" class="cat-link" data-category="global-business">Global Business</a>
@@ -50,32 +67,110 @@
     </nav>
   </header>
 
-  <!-- Main Content -->
+  <!-- Main Container -->
   <main class="container">
-    <!-- Today's Briefing Hero Card -->
-    <section id="briefing-section" class="briefing-card">
-      <div class="briefing-meta">
-        <span id="briefing-type-label">Current Briefing</span>
-        <span id="briefing-timestamp">Updated: Checking...</span>
-      </div>
-      <h2 id="briefing-title" class="briefing-title">Intelligence Briefing</h2>
-      <p id="briefing-summary" class="briefing-summary">Loading briefing and synthesizing developments...</p>
-    </section>
+    <!-- View 1: News & Intelligence Feed -->
+    <div id="view-feed" class="view-panel active">
+      <!-- Briefing Hero Card -->
+      <section id="briefing-section" class="briefing-card">
+        <div class="briefing-meta">
+          <span id="briefing-type-label">Current Briefing</span>
+          <span id="briefing-timestamp">Loading briefing status...</span>
+        </div>
+        <h2 id="briefing-title" class="briefing-title">Intelligence Briefing</h2>
+        <p id="briefing-summary" class="briefing-summary">Synthesizing latest global, national, and state developments...</p>
+      </section>
 
-    <!-- Section Heading -->
-    <div class="section-header">
-      <h3 id="feed-heading" class="section-title">Latest Developments</h3>
-      <div id="filter-status" style="font-size: 0.9rem; color: var(--text-muted);"></div>
+      <!-- Concept of the Day Spotlight -->
+      <section id="concept-spotlight" class="concept-card">
+        <div class="concept-tag">💡 CONCEPT OF THE DAY</div>
+        <h3 id="concept-title" class="concept-title">Loading concept...</h3>
+        <p id="concept-def" class="concept-def"></p>
+        <button class="btn-text" onclick="switchView('education')">Explore Full Explanation & Quiz →</button>
+      </section>
+
+      <!-- Section Heading -->
+      <div class="section-header">
+        <h3 id="feed-heading" class="section-title">Latest Developments</h3>
+        <div id="filter-status" style="font-size: 0.9rem; color: var(--text-muted);"></div>
+      </div>
+
+      <!-- Articles Grid -->
+      <div id="articles-container" class="articles-grid">
+        <div class="state-box">
+          <div class="spinner"></div>
+          <p>Loading intelligence stream...</p>
+        </div>
+      </div>
     </div>
 
-    <!-- Articles Feed Grid -->
-    <div id="articles-container" class="articles-grid">
-      <div class="state-box">
-        <div class="spinner"></div>
-        <p>Loading intelligence stream...</p>
+    <!-- View 2: Knowledge Library & Education -->
+    <div id="view-education" class="view-panel">
+      <div class="section-header">
+        <h3 class="section-title">Educational Knowledge Library</h3>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Deep background on core systems behind the news.</p>
       </div>
+
+      <!-- Featured Topic Detail -->
+      <div id="topic-detail-card" class="topic-detail-card">
+        <div class="state-box">
+          <div class="spinner"></div>
+          <p>Loading educational topic...</p>
+        </div>
+      </div>
+
+      <!-- Other Topics List -->
+      <div class="section-header" style="margin-top: 32px;">
+        <h4 class="section-title" style="font-size: 1.2rem;">All Core Concepts</h4>
+      </div>
+      <div id="topics-list-container" class="topics-grid"></div>
     </div>
   </main>
+
+  <!-- Article Detail Modal -->
+  <div id="article-modal" class="modal-backdrop" onclick="closeArticleModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <span id="modal-publisher" class="publisher-badge"></span>
+        <button class="modal-close-btn" onclick="closeArticleModal()">&times;</button>
+      </div>
+      <h2 id="modal-headline" class="modal-headline"></h2>
+      <div id="modal-meta" class="modal-meta"></div>
+
+      <div class="modal-body">
+        <div class="modal-section">
+          <h4>Summary</h4>
+          <p id="modal-summary" class="modal-text"></p>
+        </div>
+
+        <div class="modal-section">
+          <h4>Detailed Explanation</h4>
+          <p id="modal-detailed" class="modal-text"></p>
+        </div>
+
+        <div class="modal-section why-matters-box">
+          <strong id="modal-why-heading">Why It Matters</strong>
+          <p id="modal-why-matters" style="margin-top: 4px;"></p>
+        </div>
+
+        <div id="modal-facts-section" class="modal-section">
+          <h4>Key Facts & Figures</h4>
+          <ul id="modal-facts" class="facts-list"></ul>
+        </div>
+
+        <div id="modal-bg-section" class="modal-section">
+          <h4>Historical & Institutional Background</h4>
+          <p id="modal-background" class="modal-text"></p>
+        </div>
+
+        <div class="modal-footer">
+          <a id="modal-original-link" href="#" target="_blank" rel="noopener noreferrer" class="btn-primary">
+            Read Original Reporting at Source ↗
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="/static/js/app.js"></script>
 </body>
